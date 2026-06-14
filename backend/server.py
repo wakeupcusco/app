@@ -1,26 +1,83 @@
-from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+import bcrypt
+import jwt
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+JWT_SECRET = os.environ['JWT_SECRET']
+JWT_ALGORITHM = "HS256"
+
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
+# ==================== AUTH HELPERS ====================
+
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+def create_access_token(user_id: str, email: str, role: str) -> str:
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "role": role,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=8),
+        "type": "access"
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if not token:
+        raise HTTPException(status_code=401, detail="No autenticado")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(status_code=401, detail="Usuario no encontrado")
+        user["id"] = str(user["_id"])
+        user.pop("_id", None)
+        user.pop("password_hash", None)
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expirado")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Token inv\u00e1lido")
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Acceso denegado. Se requiere rol de administrador")
+    return user
+
 # ==================== MODELS ====================
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 class ProductCreate(BaseModel):
     codigo: str
@@ -144,10 +201,51 @@ class InventoryAdjustment(BaseModel):
     cantidad: int
     motivo: str
 
+# ==================== AUTH ENDPOINTS ====================
+
+@api_router.post("/auth/login")
+async def login(request: LoginRequest, response: Response):
+    email = request.email.lower().strip()
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    if not verify_password(request.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    
+    user_id = str(user["_id"])
+    access_token = create_access_token(user_id, user["email"], user["role"])
+    
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=28800,
+        path="/"
+    )
+    
+    return {
+        "id": user_id,
+        "email": user["email"],
+        "nombre": user["nombre"],
+        "role": user["role"],
+        "access_token": access_token
+    }
+
+@api_router.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie(key="access_token", path="/")
+    return {"message": "Sesión cerrada"}
+
+@api_router.get("/auth/me")
+async def get_me(user: dict = Depends(get_current_user)):
+    return user
+
 # ==================== PRODUCTOS ====================
 
 @api_router.post("/productos", response_model=Product)
-async def create_product(product: ProductCreate):
+async def create_product(product: ProductCreate, user: dict = Depends(get_current_user)):
     existing = await db.products.find_one({"codigo": product.codigo}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="El código de producto ya existe")
@@ -163,19 +261,19 @@ async def create_product(product: ProductCreate):
     return Product(**doc)
 
 @api_router.get("/productos", response_model=List[Product])
-async def get_products():
+async def get_products(user: dict = Depends(get_current_user)):
     products = await db.products.find({}, {"_id": 0}).to_list(1000)
     return products
 
 @api_router.get("/productos/{codigo}", response_model=Product)
-async def get_product(codigo: str):
+async def get_product(codigo: str, user: dict = Depends(get_current_user)):
     product = await db.products.find_one({"codigo": codigo}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     return product
 
 @api_router.put("/productos/{codigo}", response_model=Product)
-async def update_product(codigo: str, product: ProductCreate):
+async def update_product(codigo: str, product: ProductCreate, user: dict = Depends(get_current_user)):
     existing = await db.products.find_one({"codigo": codigo}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -186,10 +284,10 @@ async def update_product(codigo: str, product: ProductCreate):
     doc['fecha_creacion'] = existing['fecha_creacion']
     
     await db.products.update_one({"codigo": codigo}, {"$set": doc})
-    return Product(**doc)
+    return Product(**doc, codigo=codigo)
 
 @api_router.delete("/productos/{codigo}")
-async def delete_product(codigo: str):
+async def delete_product(codigo: str, user: dict = Depends(require_admin)):
     result = await db.products.delete_one({"codigo": codigo})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -198,7 +296,7 @@ async def delete_product(codigo: str):
 # ==================== VENTAS ====================
 
 @api_router.post("/ventas", response_model=Sale)
-async def create_sale(sale: SaleCreate):
+async def create_sale(sale: SaleCreate, user: dict = Depends(get_current_user)):
     total = sum(item.subtotal for item in sale.items)
     fecha = datetime.now(timezone.utc).isoformat()
     sale_id = str(ObjectId())
@@ -224,14 +322,14 @@ async def create_sale(sale: SaleCreate):
     return Sale(**doc)
 
 @api_router.get("/ventas", response_model=List[Sale])
-async def get_sales():
+async def get_sales(user: dict = Depends(get_current_user)):
     sales = await db.sales.find({}, {"_id": 0}).sort("fecha", -1).to_list(1000)
     return sales
 
-# ==================== COMPRAS ====================
+# ==================== COMPRAS (Solo Admin) ====================
 
 @api_router.post("/compras", response_model=Purchase)
-async def create_purchase(purchase: PurchaseCreate):
+async def create_purchase(purchase: PurchaseCreate, user: dict = Depends(require_admin)):
     total = sum(item.subtotal for item in purchase.items)
     fecha = datetime.now(timezone.utc).isoformat()
     purchase_id = str(ObjectId())
@@ -255,14 +353,14 @@ async def create_purchase(purchase: PurchaseCreate):
     return Purchase(**doc)
 
 @api_router.get("/compras", response_model=List[Purchase])
-async def get_purchases():
+async def get_purchases(user: dict = Depends(require_admin)):
     purchases = await db.purchases.find({}, {"_id": 0}).sort("fecha", -1).to_list(1000)
     return purchases
 
 # ==================== CLIENTES ====================
 
 @api_router.post("/clientes", response_model=Customer)
-async def create_customer(customer: CustomerCreate):
+async def create_customer(customer: CustomerCreate, user: dict = Depends(get_current_user)):
     fecha_registro = datetime.now(timezone.utc).isoformat()
     customer_id = str(ObjectId())
     
@@ -274,12 +372,12 @@ async def create_customer(customer: CustomerCreate):
     return Customer(**doc)
 
 @api_router.get("/clientes", response_model=List[Customer])
-async def get_customers():
+async def get_customers(user: dict = Depends(get_current_user)):
     customers = await db.customers.find({}, {"_id": 0}).to_list(1000)
     return customers
 
 @api_router.put("/clientes/{customer_id}", response_model=Customer)
-async def update_customer(customer_id: str, customer: CustomerCreate):
+async def update_customer(customer_id: str, customer: CustomerCreate, user: dict = Depends(get_current_user)):
     existing = await db.customers.find_one({"id": customer_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
@@ -292,16 +390,16 @@ async def update_customer(customer_id: str, customer: CustomerCreate):
     return Customer(**doc)
 
 @api_router.delete("/clientes/{customer_id}")
-async def delete_customer(customer_id: str):
+async def delete_customer(customer_id: str, user: dict = Depends(get_current_user)):
     result = await db.customers.delete_one({"id": customer_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     return {"message": "Cliente eliminado exitosamente"}
 
-# ==================== MOVIMIENTOS DE CAJA ====================
+# ==================== MOVIMIENTOS DE CAJA (Solo Admin) ====================
 
 @api_router.post("/caja", response_model=CashMovement)
-async def create_cash_movement(movement: CashMovementCreate):
+async def create_cash_movement(movement: CashMovementCreate, user: dict = Depends(require_admin)):
     fecha = datetime.now(timezone.utc).isoformat()
     movement_id = str(ObjectId())
     total = movement.efectivo + movement.yape + movement.plin + movement.transferencia
@@ -315,14 +413,14 @@ async def create_cash_movement(movement: CashMovementCreate):
     return CashMovement(**doc)
 
 @api_router.get("/caja", response_model=List[CashMovement])
-async def get_cash_movements():
+async def get_cash_movements(user: dict = Depends(require_admin)):
     movements = await db.cash_movements.find({}, {"_id": 0}).sort("fecha", -1).to_list(1000)
     return movements
 
-# ==================== AJUSTES DE INVENTARIO ====================
+# ==================== AJUSTES DE INVENTARIO (Solo Admin) ====================
 
 @api_router.post("/ajustes", response_model=InventoryAdjustment)
-async def create_inventory_adjustment(adjustment: InventoryAdjustmentCreate):
+async def create_inventory_adjustment(adjustment: InventoryAdjustmentCreate, user: dict = Depends(require_admin)):
     product = await db.products.find_one({"codigo": adjustment.codigo_producto}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -349,15 +447,15 @@ async def create_inventory_adjustment(adjustment: InventoryAdjustmentCreate):
     return InventoryAdjustment(**doc)
 
 @api_router.get("/ajustes", response_model=List[InventoryAdjustment])
-async def get_inventory_adjustments():
+async def get_inventory_adjustments(user: dict = Depends(require_admin)):
     adjustments = await db.inventory_adjustments.find({}, {"_id": 0}).sort("fecha", -1).to_list(1000)
     return adjustments
 
 # ==================== DASHBOARD STATS ====================
 
 @api_router.get("/dashboard/stats")
-async def get_dashboard_stats():
-    from datetime import datetime as dt, timedelta
+async def get_dashboard_stats(user: dict = Depends(get_current_user)):
+    from datetime import datetime as dt
     
     now = dt.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
@@ -417,6 +515,52 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def startup_event():
+    # Seed admin user
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@plantastika.com")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    vendedor_email = os.environ.get("VENDEDOR_EMAIL", "vendedora@plantastika.com")
+    vendedor_password = os.environ.get("VENDEDOR_PASSWORD", "vendedora123")
+    
+    await db.users.create_index("email", unique=True)
+    
+    # Admin
+    existing_admin = await db.users.find_one({"email": admin_email})
+    if not existing_admin:
+        await db.users.insert_one({
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "nombre": "Administrador",
+            "role": "admin",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        logger.info(f"Admin creado: {admin_email}")
+    else:
+        if not verify_password(admin_password, existing_admin["password_hash"]):
+            await db.users.update_one(
+                {"email": admin_email},
+                {"$set": {"password_hash": hash_password(admin_password)}}
+            )
+    
+    # Vendedor
+    existing_vendedor = await db.users.find_one({"email": vendedor_email})
+    if not existing_vendedor:
+        await db.users.insert_one({
+            "email": vendedor_email,
+            "password_hash": hash_password(vendedor_password),
+            "nombre": "Vendedora",
+            "role": "vendedor",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        logger.info(f"Vendedor creado: {vendedor_email}")
+    else:
+        if not verify_password(vendedor_password, existing_vendedor["password_hash"]):
+            await db.users.update_one(
+                {"email": vendedor_email},
+                {"$set": {"password_hash": hash_password(vendedor_password)}}
+            )
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
