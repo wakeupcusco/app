@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, PencilSimple, Trash, Package, UploadSimple, X } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, Package, UploadSimple, X, Barcode, Camera } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 const categorias = [
   "Interior", "Flores", "Kokedamas", "Terrarios", "Suculentas", 
@@ -25,7 +26,10 @@ const Productos = () => {
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [searchBarcode, setSearchBarcode] = useState("");
+  const [isSearchScannerOpen, setIsSearchScannerOpen] = useState(false);
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     codigo: "",
@@ -38,7 +42,8 @@ const Productos = () => {
     proveedor: "",
     ubicacion: "",
     coleccion: "",
-    imagen: ""
+    imagen: "",
+    codigo_barras: ""
   });
 
   useEffect(() => {
@@ -73,7 +78,6 @@ const Productos = () => {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      // Resize image to reduce size
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
@@ -111,6 +115,24 @@ const Productos = () => {
     setFormData({ ...formData, imagen: "" });
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const handleBarcodeScanned = (code) => {
+    setFormData({ ...formData, codigo_barras: code });
+    setIsScannerOpen(false);
+    toast.success(`Código escaneado: ${code}`);
+  };
+
+  const handleSearchBarcodeScanned = async (code) => {
+    setIsSearchScannerOpen(false);
+    setSearchBarcode(code);
+    try {
+      const response = await api.get(`/productos/barras/${code}`);
+      handleEdit(response.data);
+      toast.success(`Producto encontrado: ${response.data.nombre}`);
+    } catch (error) {
+      toast.error("Producto no encontrado con ese código de barras");
     }
   };
 
@@ -158,7 +180,8 @@ const Productos = () => {
       proveedor: "",
       ubicacion: "",
       coleccion: "",
-      imagen: ""
+      imagen: "",
+      codigo_barras: ""
     });
     setEditingProduct(null);
     if (fileInputRef.current) {
@@ -179,7 +202,8 @@ const Productos = () => {
       proveedor: producto.proveedor || "",
       ubicacion: producto.ubicacion || "",
       coleccion: producto.coleccion || "",
-      imagen: producto.imagen || ""
+      imagen: producto.imagen || "",
+      codigo_barras: producto.codigo_barras || ""
     });
     setIsDialogOpen(true);
   };
@@ -198,221 +222,276 @@ const Productos = () => {
           </h1>
           <p className="text-[#6B705C] mt-2">Gestiona tu inventario de plantas y productos</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={handleOpenDialog}
-              className="bg-[#4A5D23] hover:bg-[#3B4A1C] text-white"
-              data-testid="add-product-button"
-            >
-              <Plus size={20} weight="bold" className="mr-2" />
-              Nuevo Producto
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle data-testid="dialog-title">
-                {editingProduct ? "Editar Producto" : "Nuevo Producto"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4" data-testid="product-form">
-              {/* Image Upload */}
-              <div>
-                <Label>Imagen del Producto</Label>
-                <div className="mt-2 flex items-center gap-4">
-                  <div className="w-32 h-32 border-2 border-dashed border-[#E8E6E1] rounded-lg overflow-hidden flex items-center justify-center bg-[#F9F8F6]">
-                    {formData.imagen ? (
-                      <img 
-                        src={formData.imagen} 
-                        alt="Preview" 
-                        className="w-full h-full object-cover"
-                        data-testid="product-image-preview"
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setIsSearchScannerOpen(true)}
+            variant="outline"
+            className="border-[#4A5D23] text-[#4A5D23] hover:bg-[#E9F5E9]"
+            data-testid="search-by-barcode-button"
+          >
+            <Camera size={20} weight="duotone" className="mr-2" />
+            Escanear
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                onClick={handleOpenDialog}
+                className="bg-[#4A5D23] hover:bg-[#3B4A1C] text-white"
+                data-testid="add-product-button"
+              >
+                <Plus size={20} weight="bold" className="mr-2" />
+                Nuevo Producto
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle data-testid="dialog-title">
+                  {editingProduct ? "Editar Producto" : "Nuevo Producto"}
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4" data-testid="product-form">
+                {/* Image Upload */}
+                <div>
+                  <Label>Imagen del Producto</Label>
+                  <div className="mt-2 flex items-center gap-4">
+                    <div className="w-32 h-32 border-2 border-dashed border-[#E8E6E1] rounded-lg overflow-hidden flex items-center justify-center bg-[#F9F8F6]">
+                      {formData.imagen ? (
+                        <img 
+                          src={formData.imagen} 
+                          alt="Preview" 
+                          className="w-full h-full object-cover"
+                          data-testid="product-image-preview"
+                        />
+                      ) : (
+                        <Package size={36} weight="duotone" className="text-[#A5A58D]" />
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        data-testid="image-upload-input"
                       />
-                    ) : (
-                      <Package size={36} weight="duotone" className="text-[#A5A58D]" />
-                    )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        data-testid="upload-image-button"
+                      >
+                        <UploadSimple size={18} className="mr-2" />
+                        Subir Imagen
+                      </Button>
+                      {formData.imagen && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleRemoveImage}
+                          className="text-[#BC4749] border-[#BC4749] hover:bg-[#FDF0F0]"
+                          data-testid="remove-image-button"
+                        >
+                          <X size={18} className="mr-2" />
+                          Quitar Imagen
+                        </Button>
+                      )}
+                      <p className="text-xs text-[#6B705C]">Máx 2MB. JPG, PNG, WebP</p>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      data-testid="image-upload-input"
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="codigo">Código *</Label>
+                    <Input
+                      id="codigo"
+                      data-testid="input-codigo"
+                      value={formData.codigo}
+                      onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                      required
+                      disabled={editingProduct !== null}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="nombre">Nombre *</Label>
+                    <Input
+                      id="nombre"
+                      data-testid="input-nombre"
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Código de Barras */}
+                <div>
+                  <Label htmlFor="codigo_barras" className="flex items-center gap-2">
+                    <Barcode size={18} weight="duotone" />
+                    Código de Barras
+                  </Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      id="codigo_barras"
+                      data-testid="input-codigo-barras"
+                      value={formData.codigo_barras}
+                      onChange={(e) => setFormData({ ...formData, codigo_barras: e.target.value })}
+                      placeholder="Escanea o ingresa manualmente"
                     />
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      data-testid="upload-image-button"
+                      onClick={() => setIsScannerOpen(true)}
+                      className="bg-[#4A5D23] text-white hover:bg-[#3B4A1C] border-[#4A5D23]"
+                      data-testid="scan-barcode-button"
                     >
-                      <UploadSimple size={18} className="mr-2" />
-                      Subir Imagen
+                      <Camera size={18} className="mr-2" />
+                      Escanear
                     </Button>
-                    {formData.imagen && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleRemoveImage}
-                        className="text-[#BC4749] border-[#BC4749] hover:bg-[#FDF0F0]"
-                        data-testid="remove-image-button"
-                      >
-                        <X size={18} className="mr-2" />
-                        Quitar Imagen
-                      </Button>
-                    )}
-                    <p className="text-xs text-[#6B705C]">Máx 2MB. JPG, PNG, WebP</p>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="codigo">Código *</Label>
-                  <Input
-                    id="codigo"
-                    data-testid="input-codigo"
-                    value={formData.codigo}
-                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                    required
-                    disabled={editingProduct !== null}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="categoria">Categoría *</Label>
+                    <Select
+                      value={formData.categoria}
+                      onValueChange={(value) => setFormData({ ...formData, categoria: value })}
+                    >
+                      <SelectTrigger data-testid="select-categoria">
+                        <SelectValue placeholder="Selecciona categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categorias.map((cat) => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {isAdmin && (
+                    <div>
+                      <Label htmlFor="proveedor">Proveedor</Label>
+                      <Input
+                        id="proveedor"
+                        data-testid="input-proveedor"
+                        value={formData.proveedor}
+                        onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
+                      />
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <Label htmlFor="nombre">Nombre *</Label>
-                  <Input
-                    id="nombre"
-                    data-testid="input-nombre"
-                    value={formData.nombre}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="categoria">Categoría *</Label>
-                  <Select
-                    value={formData.categoria}
-                    onValueChange={(value) => setFormData({ ...formData, categoria: value })}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="stock">Stock *</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      data-testid="input-stock"
+                      value={formData.stock}
+                      onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="stock_minimo">Stock Mínimo *</Label>
+                    <Input
+                      id="stock_minimo"
+                      type="number"
+                      data-testid="input-stock-minimo"
+                      value={formData.stock_minimo}
+                      onChange={(e) => setFormData({ ...formData, stock_minimo: parseInt(e.target.value) || 0 })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Costo Compra: Solo visible para Admin */}
+                  {isAdmin && (
+                    <div>
+                      <Label htmlFor="costo_compra">Costo Compra *</Label>
+                      <Input
+                        id="costo_compra"
+                        type="number"
+                        step="0.01"
+                        data-testid="input-costo-compra"
+                        value={formData.costo_compra}
+                        onChange={(e) => setFormData({ ...formData, costo_compra: parseFloat(e.target.value) || 0 })}
+                        required
+                      />
+                    </div>
+                  )}
+                  <div className={isAdmin ? "" : "col-span-2"}>
+                    <Label htmlFor="precio_venta">Precio Venta *</Label>
+                    <Input
+                      id="precio_venta"
+                      type="number"
+                      step="0.01"
+                      data-testid="input-precio-venta"
+                      value={formData.precio_venta}
+                      onChange={(e) => setFormData({ ...formData, precio_venta: parseFloat(e.target.value) || 0 })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="ubicacion">Ubicación</Label>
+                    <Input
+                      id="ubicacion"
+                      data-testid="input-ubicacion"
+                      value={formData.ubicacion}
+                      onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="coleccion">Colección</Label>
+                    <Input
+                      id="coleccion"
+                      data-testid="input-coleccion"
+                      value={formData.coleccion}
+                      onChange={(e) => setFormData({ ...formData, coleccion: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                    data-testid="cancel-button"
                   >
-                    <SelectTrigger data-testid="select-categoria">
-                      <SelectValue placeholder="Selecciona categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias.map((cat) => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="bg-[#4A5D23] hover:bg-[#3B4A1C]"
+                    data-testid="save-product-button"
+                  >
+                    {editingProduct ? "Actualizar" : "Crear"}
+                  </Button>
                 </div>
-                <div>
-                  <Label htmlFor="proveedor">Proveedor</Label>
-                  <Input
-                    id="proveedor"
-                    data-testid="input-proveedor"
-                    value={formData.proveedor}
-                    onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="stock">Stock *</Label>
-                  <Input
-                    id="stock"
-                    type="number"
-                    data-testid="input-stock"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="stock_minimo">Stock Mínimo *</Label>
-                  <Input
-                    id="stock_minimo"
-                    type="number"
-                    data-testid="input-stock-minimo"
-                    value={formData.stock_minimo}
-                    onChange={(e) => setFormData({ ...formData, stock_minimo: parseInt(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="costo_compra">Costo Compra *</Label>
-                  <Input
-                    id="costo_compra"
-                    type="number"
-                    step="0.01"
-                    data-testid="input-costo-compra"
-                    value={formData.costo_compra}
-                    onChange={(e) => setFormData({ ...formData, costo_compra: parseFloat(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="precio_venta">Precio Venta *</Label>
-                  <Input
-                    id="precio_venta"
-                    type="number"
-                    step="0.01"
-                    data-testid="input-precio-venta"
-                    value={formData.precio_venta}
-                    onChange={(e) => setFormData({ ...formData, precio_venta: parseFloat(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="ubicacion">Ubicación</Label>
-                  <Input
-                    id="ubicacion"
-                    data-testid="input-ubicacion"
-                    value={formData.ubicacion}
-                    onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="coleccion">Colección</Label>
-                  <Input
-                    id="coleccion"
-                    data-testid="input-coleccion"
-                    value={formData.coleccion}
-                    onChange={(e) => setFormData({ ...formData, coleccion: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                  data-testid="cancel-button"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  type="submit" 
-                  className="bg-[#4A5D23] hover:bg-[#3B4A1C]"
-                  data-testid="save-product-button"
-                >
-                  {editingProduct ? "Actualizar" : "Crear"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      <BarcodeScanner 
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleBarcodeScanned}
+      />
+      
+      <BarcodeScanner 
+        isOpen={isSearchScannerOpen}
+        onClose={() => setIsSearchScannerOpen(false)}
+        onScan={handleSearchBarcodeScanned}
+      />
 
       <Card className="border-[#E8E6E1] shadow-sm" data-testid="productos-table-card">
         <CardContent className="p-0">
@@ -433,11 +512,12 @@ const Productos = () => {
                   <TableHead>Imagen</TableHead>
                   <TableHead>Código</TableHead>
                   <TableHead>Nombre</TableHead>
+                  <TableHead>Cód. Barras</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead>Stock</TableHead>
-                  <TableHead>Costo</TableHead>
+                  {isAdmin && <TableHead>Costo</TableHead>}
                   <TableHead>Precio</TableHead>
-                  <TableHead>Utilidad</TableHead>
+                  {isAdmin && <TableHead>Utilidad</TableHead>}
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -453,6 +533,9 @@ const Productos = () => {
                     </TableCell>
                     <TableCell className="font-medium">{producto.codigo}</TableCell>
                     <TableCell>{producto.nombre}</TableCell>
+                    <TableCell className="text-xs text-[#6B705C]">
+                      {producto.codigo_barras || "-"}
+                    </TableCell>
                     <TableCell>
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#E9F5E9] text-[#386641]">
                         {producto.categoria}
@@ -463,9 +546,9 @@ const Productos = () => {
                         {producto.stock}
                       </span>
                     </TableCell>
-                    <TableCell>S/ {producto.costo_compra.toFixed(2)}</TableCell>
+                    {isAdmin && <TableCell>S/ {producto.costo_compra.toFixed(2)}</TableCell>}
                     <TableCell>S/ {producto.precio_venta.toFixed(2)}</TableCell>
-                    <TableCell className="text-[#386641] font-semibold">S/ {producto.utilidad.toFixed(2)}</TableCell>
+                    {isAdmin && <TableCell className="text-[#386641] font-semibold">S/ {producto.utilidad.toFixed(2)}</TableCell>}
                     <TableCell>
                       <div className="flex gap-2">
                         <Button

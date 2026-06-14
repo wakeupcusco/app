@@ -7,14 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, ShoppingBag, Trash } from "@phosphor-icons/react";
+import { Plus, ShoppingBag, Trash, Package } from "@phosphor-icons/react";
 import { toast } from "sonner";
+
+const categorias = [
+  "Interior", "Flores", "Kokedamas", "Terrarios", "Suculentas", 
+  "Espinos", "Arreglos", "Macetas", "Insecticidas", "Fungicidas",
+  "Fertilizantes", "Enraizantes", "Abono Foliar", "Atomizadores", 
+  "Sustratos", "Accesorios"
+];
 
 const Compras = () => {
   const [compras, setCompras] = useState([]);
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [currentItem, setCurrentItem] = useState({
     producto: null,
@@ -22,6 +30,18 @@ const Compras = () => {
     costo_unit: 0
   });
   const [proveedor, setProveedor] = useState("");
+  const [newProduct, setNewProduct] = useState({
+    codigo: "",
+    nombre: "",
+    categoria: "",
+    stock: 0,
+    stock_minimo: 5,
+    costo_compra: 0,
+    precio_venta: 0,
+    proveedor: "",
+    ubicacion: "",
+    codigo_barras: ""
+  });
 
   useEffect(() => {
     loadData();
@@ -71,6 +91,39 @@ const Compras = () => {
     setItems(items.filter((_, i) => i !== index));
   };
 
+  const handleCreateNewProduct = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await api.post("/productos", { ...newProduct, stock: 0 });
+      toast.success(`Producto "${response.data.nombre}" creado`);
+      
+      // Recargar productos y seleccionar el nuevo
+      await loadData();
+      setCurrentItem({
+        producto: response.data.codigo,
+        cantidad: 1,
+        costo_unit: response.data.costo_compra
+      });
+      
+      // Reset y cerrar diálogo
+      setNewProduct({
+        codigo: "",
+        nombre: "",
+        categoria: "",
+        stock: 0,
+        stock_minimo: 5,
+        costo_compra: 0,
+        precio_venta: 0,
+        proveedor: proveedor,
+        ubicacion: "",
+        codigo_barras: ""
+      });
+      setIsNewProductDialogOpen(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Error al crear producto");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (items.length === 0) {
@@ -103,6 +156,15 @@ const Compras = () => {
     setProveedor("");
   };
 
+  const handleSelectProduct = (codigo) => {
+    const producto = productos.find(p => p.codigo === codigo);
+    setCurrentItem({
+      producto: codigo,
+      cantidad: 1,
+      costo_unit: producto?.costo_compra || 0
+    });
+  };
+
   const total = items.reduce((sum, item) => sum + item.subtotal, 0);
 
   return (
@@ -112,7 +174,7 @@ const Compras = () => {
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tighter text-[#2D312E]" data-testid="compras-title">
             Compras
           </h1>
-          <p className="text-[#6B705C] mt-2">Registra compras a proveedores</p>
+          <p className="text-[#6B705C] mt-2">Registra compras a proveedores y actualiza tu stock</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -125,7 +187,7 @@ const Compras = () => {
               Nueva Compra
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle data-testid="dialog-title">Nueva Compra</DialogTitle>
             </DialogHeader>
@@ -143,21 +205,30 @@ const Compras = () => {
               </div>
 
               {/* Agregar Productos */}
-              <div className="space-y-4">
-                <h3 className="font-semibold text-[#2D312E]">Agregar Productos</h3>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="col-span-2">
-                    <Label>Producto</Label>
+              <div className="space-y-4 p-4 bg-[#F9F8F6] rounded-lg border border-[#E8E6E1]">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-[#2D312E]">Agregar Producto</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setNewProduct((prev) => ({ ...prev, proveedor: proveedor }));
+                      setIsNewProductDialogOpen(true);
+                    }}
+                    className="border-[#4A5D23] text-[#4A5D23] hover:bg-[#E9F5E9]"
+                    data-testid="create-new-product-button"
+                  >
+                    <Package size={18} className="mr-2" />
+                    Crear Producto Nuevo
+                  </Button>
+                </div>
+                <div className="grid grid-cols-12 gap-3">
+                  <div className="col-span-5">
+                    <Label>Producto Existente</Label>
                     <Select
                       value={currentItem.producto}
-                      onValueChange={(value) => {
-                        const prod = productos.find(p => p.codigo === value);
-                        setCurrentItem({ 
-                          ...currentItem, 
-                          producto: value,
-                          costo_unit: prod?.costo_compra || 0
-                        });
-                      }}
+                      onValueChange={handleSelectProduct}
                     >
                       <SelectTrigger data-testid="select-producto">
                         <SelectValue placeholder="Selecciona producto" />
@@ -165,13 +236,13 @@ const Compras = () => {
                       <SelectContent>
                         {productos.map((prod) => (
                           <SelectItem key={prod.codigo} value={prod.codigo}>
-                            {prod.nombre}
+                            {prod.nombre} (Stock: {prod.stock})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <Label>Cantidad</Label>
                     <Input
                       type="number"
@@ -181,28 +252,32 @@ const Compras = () => {
                       onChange={(e) => setCurrentItem({ ...currentItem, cantidad: parseInt(e.target.value) || 1 })}
                     />
                   </div>
-                  <div>
+                  <div className="col-span-3">
                     <Label>Costo Unit.</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        data-testid="input-costo"
-                        value={currentItem.costo_unit}
-                        onChange={(e) => setCurrentItem({ ...currentItem, costo_unit: parseFloat(e.target.value) || 0 })}
-                      />
-                      <Button
-                        type="button"
-                        onClick={handleAddItem}
-                        className="bg-[#4A5D23] hover:bg-[#3B4A1C]"
-                        data-testid="add-item-button"
-                      >
-                        <Plus size={20} />
-                      </Button>
-                    </div>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      data-testid="input-costo"
+                      value={currentItem.costo_unit}
+                      onChange={(e) => setCurrentItem({ ...currentItem, costo_unit: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="col-span-2 flex items-end">
+                    <Button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="w-full bg-[#4A5D23] hover:bg-[#3B4A1C]"
+                      data-testid="add-item-button"
+                    >
+                      <Plus size={18} className="mr-1" />
+                      Agregar
+                    </Button>
                   </div>
                 </div>
+                <p className="text-xs text-[#6B705C]">
+                  💡 Si el producto no existe en tu inventario, créalo con el botón "Crear Producto Nuevo"
+                </p>
               </div>
 
               {/* Lista de Items */}
@@ -274,6 +349,137 @@ const Compras = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Diálogo de crear producto nuevo */}
+      <Dialog open={isNewProductDialogOpen} onOpenChange={setIsNewProductDialogOpen}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Crear Producto Nuevo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateNewProduct} className="space-y-4" data-testid="new-product-form">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="np-codigo">Código *</Label>
+                <Input
+                  id="np-codigo"
+                  data-testid="new-product-codigo"
+                  value={newProduct.codigo}
+                  onChange={(e) => setNewProduct({ ...newProduct, codigo: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="np-nombre">Nombre *</Label>
+                <Input
+                  id="np-nombre"
+                  data-testid="new-product-nombre"
+                  value={newProduct.nombre}
+                  onChange={(e) => setNewProduct({ ...newProduct, nombre: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="np-categoria">Categoría *</Label>
+                <Select
+                  value={newProduct.categoria}
+                  onValueChange={(value) => setNewProduct({ ...newProduct, categoria: value })}
+                >
+                  <SelectTrigger data-testid="new-product-categoria">
+                    <SelectValue placeholder="Selecciona categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categorias.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="np-codigo-barras">Código de Barras</Label>
+                <Input
+                  id="np-codigo-barras"
+                  data-testid="new-product-codigo-barras"
+                  value={newProduct.codigo_barras}
+                  onChange={(e) => setNewProduct({ ...newProduct, codigo_barras: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="np-costo">Costo Compra *</Label>
+                <Input
+                  id="np-costo"
+                  type="number"
+                  step="0.01"
+                  data-testid="new-product-costo"
+                  value={newProduct.costo_compra}
+                  onChange={(e) => setNewProduct({ ...newProduct, costo_compra: parseFloat(e.target.value) || 0 })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="np-precio">Precio Venta *</Label>
+                <Input
+                  id="np-precio"
+                  type="number"
+                  step="0.01"
+                  data-testid="new-product-precio"
+                  value={newProduct.precio_venta}
+                  onChange={(e) => setNewProduct({ ...newProduct, precio_venta: parseFloat(e.target.value) || 0 })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="np-stock-min">Stock Mínimo</Label>
+                <Input
+                  id="np-stock-min"
+                  type="number"
+                  data-testid="new-product-stock-min"
+                  value={newProduct.stock_minimo}
+                  onChange={(e) => setNewProduct({ ...newProduct, stock_minimo: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="np-ubicacion">Ubicación</Label>
+                <Input
+                  id="np-ubicacion"
+                  data-testid="new-product-ubicacion"
+                  value={newProduct.ubicacion}
+                  onChange={(e) => setNewProduct({ ...newProduct, ubicacion: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-[#6B705C] bg-[#E9F5E9] p-3 rounded">
+              💡 El stock inicial será 0. Las unidades que estás comprando ahora se sumarán al confirmar la compra.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsNewProductDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-[#4A5D23] hover:bg-[#3B4A1C]"
+                data-testid="save-new-product-button"
+              >
+                Crear Producto
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-[#E8E6E1] shadow-sm" data-testid="compras-table-card">
         <CardContent className="p-0">

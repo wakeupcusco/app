@@ -91,6 +91,7 @@ class ProductCreate(BaseModel):
     ubicacion: Optional[str] = None
     coleccion: Optional[str] = None
     imagen: Optional[str] = None
+    codigo_barras: Optional[str] = None
 
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -106,6 +107,7 @@ class Product(BaseModel):
     ubicacion: Optional[str] = None
     coleccion: Optional[str] = None
     imagen: Optional[str] = None
+    codigo_barras: Optional[str] = None
     fecha_creacion: str
 
 class SaleItem(BaseModel):
@@ -270,6 +272,13 @@ async def get_product(codigo: str, user: dict = Depends(get_current_user)):
     product = await db.products.find_one({"codigo": codigo}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return product
+
+@api_router.get("/productos/barras/{codigo_barras}", response_model=Product)
+async def get_product_by_barcode(codigo_barras: str, user: dict = Depends(get_current_user)):
+    product = await db.products.find_one({"codigo_barras": codigo_barras}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado con ese código de barras")
     return product
 
 @api_router.put("/productos/{codigo}", response_model=Product)
