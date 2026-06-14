@@ -1,0 +1,128 @@
+{
+  "theme": "Light",
+  "archetype": "1 (Organic & Earthy)",
+  "design_philosophy": "A calm, earthy, and highly functional dashboard prioritizing minimal information density, progressive disclosure, and clear operational context for a plant store. Uses warm off-whites, moss greens, and subtle typography to maintain a grounded and natural feel.",
+  "typography": {
+    "headings": {
+      "font_family": "Manrope",
+      "weights": ["400", "600", "800"],
+      "usage": "Used for page titles, card headers, and KPI values. Use tight tracking for larger sizes.",
+      "css_classes": "font-sans tracking-tight"
+    },
+    "body": {
+      "font_family": "Figtree",
+      "weights": ["400", "500"],
+      "usage": "Used for data tables, secondary text, and labels.",
+      "css_classes": "font-sans text-stone-600"
+    },
+    "hierarchy_rules": [
+      "H1 (Dashboard Title): text-3xl sm:text-4xl font-extrabold tracking-tighter text-stone-900",
+      "H2 (Section Header): text-xl sm:text-2xl font-bold tracking-tight text-stone-800",
+      "H3 (Card Title): text-sm font-semibold tracking-wide uppercase text-stone-500",
+      "KPI Value: text-4xl font-light tracking-tighter text-stone-800",
+      "Body/Table Content: text-sm font-medium text-stone-600"
+    ]
+  },
+  "colors": {
+    "background": {
+      "main": "bg-[#F9F8F6]",
+      "card": "bg-white",
+      "sidebar": "bg-[#F3F2EF]"
+    },
+    "text": {
+      "primary": "text-[#2D312E]",
+      "secondary": "text-[#6B705C]",
+      "muted": "text-[#A5A58D]"
+    },
+    "accents": {
+      "primary": "bg-[#4A5D23]",
+      "primary_hover": "hover:bg-[#3B4A1C]",
+      "success": "text-[#386641] bg-[#E9F5E9]",
+      "warning": "text-[#BC4749] bg-[#FDF0F0]",
+      "warning_alt": "text-[#E07A5F] bg-[#FDF4E3]"
+    },
+    "borders": "border-[#E8E6E1]"
+  },
+  "layout_and_spacing": {
+    "general": "Generous spacing. Use p-6 or p-8 for cards. The dashboard should feel breathable, not cluttered.",
+    "grid_system": "Bento-style Control Room Grid: grid-cols-1 md:grid-cols-3 lg:grid-cols-4. Gap should be gap-6.",
+    "alignment": "Left-align dense content and tables. KPI cards should have left-aligned text with an icon on the top right."
+  },
+  "components": {
+    "cards": "Flat solid surfaces. border border-[#E8E6E1] rounded-xl shadow-sm. No heavy shadows. Hover: slight shadow-md.",
+    "buttons": "Primary: bg-[#4A5D23] text-white rounded-lg px-4 py-2 font-medium hover:bg-[#3B4A1C] transition-colors. Secondary: bg-white border border-[#E8E6E1] text-[#2D312E] hover:bg-stone-50.",
+    "tables": "Shadcn UI tables with generous cell padding (p-4). Use subtle border-b for rows. Header text uppercase, text-xs, tracking-wider.",
+    "badges": "Rounded-full px-2.5 py-0.5 text-xs font-semibold. Use soft background with darker text for status.",
+    "navigation": "Sidebar with glassmorphism or solid warm gray background. Use Phosphor Icons for links.",
+    "charts": "Thin-line charts or softly filled area charts using Recharts. Use primary accent color (#4A5D23) and soft gray for reference lines."
+  },
+  "motion": {
+    "hover": "Subtle translation (-translate-y-0.5) and shadow increase on cards. Color darkening on buttons.",
+    "transitions": "transition-all duration-200 ease-in-out for interactive elements."
+  },
+  "icons_and_assets": {
+    "icons_library": "@phosphor-icons/react",
+    "installation_command": "yarn add @phosphor-icons/react",
+    "usage": "Use Duotone or Regular weights for a premium SaaS feel."
+  },
+  "images": {
+    "inventory_products": [
+      {
+        "url": "https://images.unsplash.com/photo-1601985705806-5b9a71f6004f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "green potted plants on brown wooden seat",
+        "category": "inventory_item"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1604762525950-13c07ecdab8b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHw0fHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "red and green leaves on white background",
+        "category": "inventory_item"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1604762524889-3e2fcc145683?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwyfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "green plant on white ceramic pot",
+        "category": "inventory_item"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1567225557594-88d73e55f2cb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "snake plant in vase",
+        "category": "inventory_item"
+      }
+    ],
+    "backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1520515080697-c1f99f3137cf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2OTV8MHwxfHNlYXJjaHwyfHxncmVlbmhvdXNlJTIwaW50ZXJpb3J8ZW58MHx8fHwxNzgxNDY0NjE3fDA&ixlib=rb-4.1.0&q=85",
+        "description": "indoor tree and cactus near windowpane",
+        "category": "login_background"
+      }
+    ],
+    "avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1506863530036-1efeddceb993?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwzfHx1c2VyJTIwcG9ydHJhaXQlMjBmYWNlfGVufDB8fHx8MTc4MTQ2NDYxN3ww&ixlib=rb-4.1.0&q=85",
+        "description": "grayscale photo of woman wearing necklace and top",
+        "category": "customer_avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHw0fHx1c2VyJTIwcG9ydHJhaXQlMjBmYWNlfGVufDB8fHx8MTc4MTQ2NDYxN3ww&ixlib=rb-4.1.0&q=85",
+        "description": "boy's face close-up photography",
+        "category": "customer_avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwyfHx1c2VyJTIwcG9ydHJhaXQlMjBmYWNlfGVufDB8fHx8MTc4MTQ2NDYxN3ww&ixlib=rb-4.1.0&q=85",
+        "description": "shallow focus photography of woman outdoor during day",
+        "category": "customer_avatar"
+      }
+    ]
+  },
+  "testing_requirements": "All interactive and key informational elements MUST include a data-testid attribute. Convention: kebab-case, role-based. Example: data-testid=\"add-plant-button\".",
+  "instructions_to_main_agent": [
+    "Use Manrope for Headings and Figtree for Body. Add them via Google Fonts in index.html.",
+    "Install Phosphor Icons with yarn add @phosphor-icons/react.",
+    "The application should be SPA in React with Tailwind CSS and Shadcn UI. Use .js files, not .tsx.",
+    "Build a robust Dashboard layout with a left Sidebar (navigation) and main content area.",
+    "Dashboard sections needed: Overview (Metrics & Charts), Inventory (List of plants), Sales/Billing, Customers.",
+    "Use the provided image URLs for plant thumbnails in the inventory list and customer avatars in the customer list.",
+    "Implement Recharts for the main sales/inventory trends chart in the overview.",
+    "Ensure all text is in Spanish as requested ('Inventario', 'Ventas', 'Clientes', etc.).",
+    "Adhere to the E1 spacing rules: generously padded cards (p-6 or p-8) and soft, earthy color palettes."
+  ]
+}
