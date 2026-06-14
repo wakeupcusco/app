@@ -1,0 +1,27 @@
+{
+  "short_name": "Plantástika",
+  "name": "Plantástika - Control de Negocio",
+  "description": "Sistema de ventas e inventario para tienda de plantas",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#4A5D23",
+  "background_color": "#F9F8F6",
+  "lang": "es",
+  "categories": ["business", "productivity"]
+}

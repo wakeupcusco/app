@@ -11,6 +11,7 @@ import Clientes from "@/pages/Clientes";
 import Caja from "@/pages/Caja";
 import Ajustes from "@/pages/Ajustes";
 import { Toaster } from "@/components/ui/sonner";
+import InstallPWAButton from "@/components/InstallPWAButton";
 import "@/App.css";
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
         </AuthProvider>
       </BrowserRouter>
       <Toaster position="bottom-right" />
+      <InstallPWAButton />
     </div>
   );
 }
