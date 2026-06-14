@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api from "@/utils/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, PencilSimple, Trash, Package } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, Package, UploadSimple, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const categorias = [
   "Interior", "Flores", "Kokedamas", "Terrarios", "Suculentas", 
@@ -17,18 +18,15 @@ const categorias = [
   "Sustratos", "Accesorios"
 ];
 
-const imagenesProductos = [
-  "https://images.unsplash.com/photo-1601985705806-5b9a71f6004f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85",
-  "https://images.unsplash.com/photo-1604762525950-13c07ecdab8b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHw0fHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85",
-  "https://images.unsplash.com/photo-1604762524889-3e2fcc145683?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwyfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85",
-  "https://images.unsplash.com/photo-1567225557594-88d73e55f2cb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85"
-];
+const placeholderImg = "https://images.unsplash.com/photo-1601985705806-5b9a71f6004f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85";
 
 const Productos = () => {
+  const { isAdmin } = useAuth();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     codigo: "",
     nombre: "",
@@ -40,7 +38,7 @@ const Productos = () => {
     proveedor: "",
     ubicacion: "",
     coleccion: "",
-    imagen: imagenesProductos[0]
+    imagen: ""
   });
 
   useEffect(() => {
@@ -56,6 +54,63 @@ const Productos = () => {
       toast.error("Error al cargar productos");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("La imagen no debe superar los 2MB");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Solo se permiten archivos de imagen");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      // Resize image to reduce size
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 600;
+        const MAX_HEIGHT = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        setFormData((prev) => ({ ...prev, imagen: compressedDataUrl }));
+        toast.success("Imagen cargada exitosamente");
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setFormData({ ...formData, imagen: "" });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -86,7 +141,7 @@ const Productos = () => {
         loadProductos();
       } catch (error) {
         console.error("Error eliminando producto:", error);
-        toast.error("Error al eliminar producto");
+        toast.error(error.response?.data?.detail || "Error al eliminar producto");
       }
     }
   };
@@ -103,9 +158,12 @@ const Productos = () => {
       proveedor: "",
       ubicacion: "",
       coleccion: "",
-      imagen: imagenesProductos[0]
+      imagen: ""
     });
     setEditingProduct(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleEdit = (producto) => {
@@ -121,7 +179,7 @@ const Productos = () => {
       proveedor: producto.proveedor || "",
       ubicacion: producto.ubicacion || "",
       coleccion: producto.coleccion || "",
-      imagen: producto.imagen || imagenesProductos[0]
+      imagen: producto.imagen || ""
     });
     setIsDialogOpen(true);
   };
@@ -158,6 +216,57 @@ const Productos = () => {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4" data-testid="product-form">
+              {/* Image Upload */}
+              <div>
+                <Label>Imagen del Producto</Label>
+                <div className="mt-2 flex items-center gap-4">
+                  <div className="w-32 h-32 border-2 border-dashed border-[#E8E6E1] rounded-lg overflow-hidden flex items-center justify-center bg-[#F9F8F6]">
+                    {formData.imagen ? (
+                      <img 
+                        src={formData.imagen} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                        data-testid="product-image-preview"
+                      />
+                    ) : (
+                      <Package size={36} weight="duotone" className="text-[#A5A58D]" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      data-testid="image-upload-input"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      data-testid="upload-image-button"
+                    >
+                      <UploadSimple size={18} className="mr-2" />
+                      Subir Imagen
+                    </Button>
+                    {formData.imagen && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleRemoveImage}
+                        className="text-[#BC4749] border-[#BC4749] hover:bg-[#FDF0F0]"
+                        data-testid="remove-image-button"
+                      >
+                        <X size={18} className="mr-2" />
+                        Quitar Imagen
+                      </Button>
+                    )}
+                    <p className="text-xs text-[#6B705C]">Máx 2MB. JPG, PNG, WebP</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="codigo">Código *</Label>
@@ -283,23 +392,6 @@ const Productos = () => {
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="imagen">Imagen</Label>
-                <Select
-                  value={formData.imagen}
-                  onValueChange={(value) => setFormData({ ...formData, imagen: value })}
-                >
-                  <SelectTrigger data-testid="select-imagen">
-                    <SelectValue placeholder="Selecciona imagen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {imagenesProductos.map((img, idx) => (
-                      <SelectItem key={idx} value={img}>Imagen {idx + 1}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="flex justify-end gap-2 pt-4">
                 <Button
                   type="button"
@@ -354,7 +446,7 @@ const Productos = () => {
                   <TableRow key={producto.codigo} data-testid={`producto-row-${producto.codigo}`}>
                     <TableCell>
                       <img 
-                        src={producto.imagen || imagenesProductos[0]} 
+                        src={producto.imagen || placeholderImg} 
                         alt={producto.nombre}
                         className="w-12 h-12 object-cover rounded-lg"
                       />
@@ -384,15 +476,17 @@ const Productos = () => {
                         >
                           <PencilSimple size={16} />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-[#BC4749] border-[#BC4749] hover:bg-[#FDF0F0]"
-                          onClick={() => handleDelete(producto.codigo)}
-                          data-testid={`delete-product-${producto.codigo}`}
-                        >
-                          <Trash size={16} />
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-[#BC4749] border-[#BC4749] hover:bg-[#FDF0F0]"
+                            onClick={() => handleDelete(producto.codigo)}
+                            data-testid={`delete-product-${producto.codigo}`}
+                          >
+                            <Trash size={16} />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

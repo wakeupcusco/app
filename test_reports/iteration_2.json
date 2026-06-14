@@ -1,0 +1,60 @@
+{
+  "summary": "Iteration 2: Auth (JWT/bcrypt) + role-based access (admin vs vendedor) + image upload + editable sale price. 26/26 new backend pytest tests pass. Frontend verified end-to-end: admin login shows all 7 nav links; vendedora login shows only Dashboard/Productos/Ventas/Clientes (Compras/Caja/Ajustes correctly hidden) and is redirected to /dashboard when she tries /caja, /compras, /ajustes directly. Backend correctly returns 403 for vendedora token on admin-only endpoints. Product modal exposes upload-image-button + image-upload-input. Sale modal exposes input-precio-unit (editable) and all sale items testids. One UX issue: post-login Sonner welcome toast renders on top of the page-level '+ Nuevo' action buttons and blocks clicks until it auto-dismisses (~5s).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Sonner welcome toast vs page header action button",
+        "issue": "After login, the 'Bienvenido/a, ...' toast renders at top-right with high z-index and overlaps the page-level primary action buttons (Productos: '+ Nuevo Producto' / Ventas: '+ Nueva Venta'). Clicks land on the toast region for ~5s until it auto-dismisses, so a user (and Playwright) that clicks '+ Nuevo Producto' immediately gets NO modal. Confirmed: bounding box of [data-testid=add-product-button] = x=1721,y=50 which is exactly where the toast sits. Once the toast disappears, the same click opens the modal correctly.",
+        "selector": "[data-testid=\"add-product-button\"], [data-testid=\"new-sale-button\"]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "All authenticated pages",
+        "issues": ["Toast Sonner overlaps top-right primary buttons (see ui_bugs). Consider moving toast to bottom-right, or shortening duration, or adding pointer-events:none on the toaster container."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_roles.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/auth_results.xml"
+  ],
+  "action_items": [
+    "[UX/MED] Reposition or shorten the Sonner welcome toast so it does not overlap the top-right '+ Nuevo ...' action buttons. Suggested fix: set <Toaster position=\"bottom-right\" /> in App.js or pass duration={2000}, or set pointer-events:none on the toaster wrapper. This currently blocks the 'Nuevo Producto' / 'Nueva Venta' buttons for ~5s after login.",
+    "[A11Y - carryover from iter 1] Add DialogDescription / aria-describedby to Radix Dialog components (warning still expected).",
+    "[INFO] No backend regressions detected with the new auth layer."
+  ],
+  "critical_code_review_comments": [
+    "server.py login sets httpOnly cookie AND returns access_token in body — frontend stores it in localStorage. Both paths supported by get_current_user (cookie OR Bearer). OK, but pick one to avoid token-in-localStorage XSS exposure.",
+    "JWT_SECRET is read from env (good). No refresh-token endpoint — access_token expires in 8h, after which the user is silently logged out.",
+    "No brute-force / lockout on /api/auth/login (review_request playbook expected 5-fail lockout). Not implemented.",
+    "set_cookie uses secure=False — fine for preview HTTP testing, but should be True in production.",
+    "seed_admin/seed_vendedor on startup correctly updates password_hash if the env password changed (idempotent). Good.",
+    "bcrypt hashes generated at startup begin with $2b$ as expected.",
+    "DELETE /productos requires admin (require_admin) — vendedora cannot delete (correct per spec).",
+    "POST /ventas allows ANY authenticated user — vendedora can create sales (correct).",
+    "Frontend Layout.js correctly filters adminOnly nav with isAdmin flag.",
+    "Frontend ProtectedRoute redirects non-admin to /dashboard for adminOnly routes — verified working.",
+    "No pagination on GET endpoints — limit 1000 (carry-over)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_roles.py (new — 26 auth + RBAC pytest cases, all passing)"
+  ],
+  "success_rate": {
+    "backend": "100% (26/26 auth+RBAC pytest cases; full Productos/Ventas/Clientes/Caja/Ajustes/Compras coverage with both admin and vendedora tokens; image base64 persistence verified; sale with discounted unit price verified — stock decremented 10→7; all 4 payment methods Efectivo/Yape/Plin/Transferencia verified)",
+    "frontend": "95% — Admin login → dashboard → 7 nav links visible (verified). Vendedora login → 4 nav links visible, 3 hidden (verified). Vendedora direct-URL access to /caja /compras /ajustes → redirected to /dashboard (verified for all 3). Logout → /login (verified). Product modal opens after toast clears: upload-image-button + image-upload-input present (verified). Sale modal opens: select-producto / input-cantidad / input-precio-unit / add-item-button / save-sale-button all present and precio defaults editable (verified). UX issue: toast blocks action buttons immediately post-login."
+  },
+  "test_credentials": "admin@plantastika.com / admin123 ; vendedora@plantastika.com / vendedora123 (per /app/memory/test_credentials.md, working)",
+  "seed_data_creation": "test_auth_roles.py creates products/customers/sales prefixed TEST_AUTH_<ts> and cleans up at end. One TEST_CAJA_ADMIN cash movement is created and intentionally NOT deleted (no DELETE endpoint on /caja).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Both backend test files coexist in /app/backend/tests/. Run: REACT_APP_BACKEND_URL=<url> python -m pytest backend/tests/ -v. Token-based auth via Bearer header is the simplest path for backend testing (cookies also work). For UI tests, ALWAYS wait_for_timeout(5500) after login OR dismiss the toast before clicking top-right action buttons, else clicks are intercepted by the Sonner toast. The buttons themselves work correctly. testids worth knowing: login-page, input-email, input-password, login-button, logout-button, user-name, user-role, nav-link-{dashboard|productos|ventas|compras|clientes|caja|ajustes}, add-product-button, upload-image-button, image-upload-input, input-codigo, input-nombre, input-stock, input-stock-minimo, input-costo-compra, input-precio-venta, new-sale-button, select-producto, input-cantidad, input-precio-unit, add-item-button, save-sale-button.",
+  "rca_of_the_issue": "Toast-vs-button overlap: <Toaster /> (Sonner) renders at top-right by default with z-index above the page header. The Productos page header button 'Nuevo Producto' sits at top-right (x=1721,y=50,w=167,h=36). The toast region occupies the same area for ~4-5s. Result: the first click immediately after login goes to the toast (which does nothing visible) instead of the button, so the modal does not open. Mitigation options: (1) <Toaster position=\"bottom-right\" /> in App.js, (2) toast({duration:1500}) on welcome toast, (3) wrap Toaster with pointer-events:none so it never intercepts clicks while still being visible."
+}

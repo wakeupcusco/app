@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import api from "@/utils/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, ShoppingCart, Trash } from "@phosphor-icons/react";
+import { Plus, ShoppingCart, Trash, Tag } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const metodosPago = ["Efectivo", "Yape", "Plin", "Transferencia"];
 
 const Ventas = () => {
+  const { user } = useAuth();
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,16 +22,23 @@ const Ventas = () => {
   const [items, setItems] = useState([]);
   const [currentItem, setCurrentItem] = useState({
     producto: null,
-    cantidad: 1
+    cantidad: 1,
+    precio_unit: 0
   });
   const [formData, setFormData] = useState({
     metodo_pago: "Efectivo",
-    vendedor: ""
+    vendedor: user?.nombre || ""
   });
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (user?.nombre) {
+      setFormData((prev) => ({ ...prev, vendedor: user.nombre }));
+    }
+  }, [user]);
 
   const loadData = async () => {
     try {
@@ -47,6 +56,15 @@ const Ventas = () => {
     }
   };
 
+  const handleProductoChange = (codigo) => {
+    const producto = productos.find(p => p.codigo === codigo);
+    setCurrentItem({
+      producto: codigo,
+      cantidad: 1,
+      precio_unit: producto?.precio_venta || 0
+    });
+  };
+
   const handleAddItem = () => {
     if (!currentItem.producto) {
       toast.error("Selecciona un producto");
@@ -56,6 +74,10 @@ const Ventas = () => {
       toast.error("La cantidad debe ser mayor a 0");
       return;
     }
+    if (currentItem.precio_unit <= 0) {
+      toast.error("El precio debe ser mayor a 0");
+      return;
+    }
 
     const producto = productos.find(p => p.codigo === currentItem.producto);
     if (producto.stock < currentItem.cantidad) {
@@ -63,20 +85,28 @@ const Ventas = () => {
       return;
     }
 
-    const subtotal = producto.precio_venta * currentItem.cantidad;
+    const subtotal = currentItem.precio_unit * currentItem.cantidad;
     setItems([...items, {
       codigo_producto: producto.codigo,
       nombre_producto: producto.nombre,
       cantidad: currentItem.cantidad,
-      precio_unit: producto.precio_venta,
+      precio_unit: currentItem.precio_unit,
+      precio_original: producto.precio_venta,
       subtotal
     }]);
 
-    setCurrentItem({ producto: null, cantidad: 1 });
+    setCurrentItem({ producto: null, cantidad: 1, precio_unit: 0 });
   };
 
   const handleRemoveItem = (index) => {
     setItems(items.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateItemPrice = (index, newPrice) => {
+    const updated = [...items];
+    updated[index].precio_unit = newPrice;
+    updated[index].subtotal = newPrice * updated[index].cantidad;
+    setItems(updated);
   };
 
   const handleSubmit = async (e) => {
@@ -87,8 +117,9 @@ const Ventas = () => {
     }
 
     try {
+      const itemsForBackend = items.map(({ precio_original, ...rest }) => rest);
       await api.post("/ventas", {
-        items,
+        items: itemsForBackend,
         metodo_pago: formData.metodo_pago,
         vendedor: formData.vendedor
       });
@@ -104,8 +135,8 @@ const Ventas = () => {
 
   const resetForm = () => {
     setItems([]);
-    setCurrentItem({ producto: null, cantidad: 1 });
-    setFormData({ metodo_pago: "Efectivo", vendedor: "" });
+    setCurrentItem({ producto: null, cantidad: 1, precio_unit: 0 });
+    setFormData({ metodo_pago: "Efectivo", vendedor: user?.nombre || "" });
   };
 
   const total = items.reduce((sum, item) => sum + item.subtotal, 0);
@@ -130,20 +161,20 @@ const Ventas = () => {
               Nueva Venta
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle data-testid="dialog-title">Nueva Venta</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6" data-testid="sale-form">
               {/* Agregar Productos */}
-              <div className="space-y-4">
-                <h3 className="font-semibold text-[#2D312E]">Agregar Productos</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
+              <div className="space-y-4 p-4 bg-[#F9F8F6] rounded-lg border border-[#E8E6E1]">
+                <h3 className="font-semibold text-[#2D312E]">Agregar Producto</h3>
+                <div className="grid grid-cols-12 gap-3">
+                  <div className="col-span-5">
                     <Label>Producto</Label>
                     <Select
                       value={currentItem.producto}
-                      onValueChange={(value) => setCurrentItem({ ...currentItem, producto: value })}
+                      onValueChange={handleProductoChange}
                     >
                       <SelectTrigger data-testid="select-producto">
                         <SelectValue placeholder="Selecciona producto" />
@@ -151,33 +182,54 @@ const Ventas = () => {
                       <SelectContent>
                         {productos.map((prod) => (
                           <SelectItem key={prod.codigo} value={prod.codigo}>
-                            {prod.nombre} - S/ {prod.precio_venta} (Stock: {prod.stock})
+                            {prod.nombre} (Stock: {prod.stock})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <Label>Cantidad</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        min="1"
-                        data-testid="input-cantidad"
-                        value={currentItem.cantidad}
-                        onChange={(e) => setCurrentItem({ ...currentItem, cantidad: parseInt(e.target.value) || 1 })}
-                      />
-                      <Button
-                        type="button"
-                        onClick={handleAddItem}
-                        className="bg-[#4A5D23] hover:bg-[#3B4A1C]"
-                        data-testid="add-item-button"
-                      >
-                        <Plus size={20} />
-                      </Button>
-                    </div>
+                    <Input
+                      type="number"
+                      min="1"
+                      data-testid="input-cantidad"
+                      value={currentItem.cantidad}
+                      onChange={(e) => setCurrentItem({ ...currentItem, cantidad: parseInt(e.target.value) || 1 })}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <Label className="flex items-center gap-1">
+                      <Tag size={14} />
+                      Precio (editable)
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      data-testid="input-precio-unit"
+                      value={currentItem.precio_unit}
+                      onChange={(e) => setCurrentItem({ ...currentItem, precio_unit: parseFloat(e.target.value) || 0 })}
+                      placeholder="Modifica para rebaja"
+                    />
+                  </div>
+                  <div className="col-span-2 flex items-end">
+                    <Button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="w-full bg-[#4A5D23] hover:bg-[#3B4A1C]"
+                      data-testid="add-item-button"
+                    >
+                      <Plus size={18} className="mr-1" />
+                      Agregar
+                    </Button>
                   </div>
                 </div>
+                {currentItem.producto && (
+                  <p className="text-xs text-[#6B705C]">
+                    💡 Tip: Puedes modificar el precio para aplicar descuentos o rebajas en esta venta
+                  </p>
+                )}
               </div>
 
               {/* Lista de Items */}
@@ -190,7 +242,8 @@ const Ventas = () => {
                         <TableRow>
                           <TableHead>Producto</TableHead>
                           <TableHead>Cantidad</TableHead>
-                          <TableHead>Precio Unit.</TableHead>
+                          <TableHead>Precio Original</TableHead>
+                          <TableHead>Precio Venta</TableHead>
                           <TableHead>Subtotal</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
@@ -198,9 +251,29 @@ const Ventas = () => {
                       <TableBody>
                         {items.map((item, index) => (
                           <TableRow key={index} data-testid={`sale-item-${index}`}>
-                            <TableCell>{item.nombre_producto}</TableCell>
+                            <TableCell className="font-medium">{item.nombre_producto}</TableCell>
                             <TableCell>{item.cantidad}</TableCell>
-                            <TableCell>S/ {item.precio_unit.toFixed(2)}</TableCell>
+                            <TableCell className="text-[#6B705C]">
+                              S/ {item.precio_original.toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={item.precio_unit}
+                                  onChange={(e) => handleUpdateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                  className="w-24"
+                                  data-testid={`edit-price-${index}`}
+                                />
+                                {item.precio_unit < item.precio_original && (
+                                  <span className="text-xs text-[#386641] font-semibold">
+                                    -{(((item.precio_original - item.precio_unit) / item.precio_original) * 100).toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="font-semibold">S/ {item.subtotal.toFixed(2)}</TableCell>
                             <TableCell>
                               <Button
@@ -318,7 +391,7 @@ const Ventas = () => {
                       <div className="text-sm">
                         {venta.items.map((item, idx) => (
                           <div key={idx}>
-                            {item.nombre_producto} x{item.cantidad}
+                            {item.nombre_producto} x{item.cantidad} <span className="text-[#6B705C]">@ S/{item.precio_unit.toFixed(2)}</span>
                           </div>
                         ))}
                       </div>
