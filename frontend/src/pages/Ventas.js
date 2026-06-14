@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, ShoppingCart, Trash, Tag } from "@phosphor-icons/react";
+import { Plus, ShoppingCart, Trash, Tag, Camera } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 const metodosPago = ["Efectivo", "Yape", "Plin", "Transferencia"];
 
@@ -19,6 +20,7 @@ const Ventas = () => {
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [currentItem, setCurrentItem] = useState({
     producto: null,
@@ -63,6 +65,50 @@ const Ventas = () => {
       cantidad: 1,
       precio_unit: producto?.precio_venta || 0
     });
+  };
+
+  const handleBarcodeScanned = async (code) => {
+    setIsScannerOpen(false);
+    try {
+      const response = await api.get(`/productos/barras/${code}`);
+      const producto = response.data;
+      
+      if (producto.stock <= 0) {
+        toast.error(`${producto.nombre} no tiene stock disponible`);
+        return;
+      }
+      
+      // Si ya está en el carrito, incrementar cantidad
+      const existingIndex = items.findIndex(i => i.codigo_producto === producto.codigo);
+      if (existingIndex >= 0) {
+        const existing = items[existingIndex];
+        if (existing.cantidad + 1 > producto.stock) {
+          toast.error("Stock insuficiente");
+          return;
+        }
+        const updated = [...items];
+        updated[existingIndex] = {
+          ...existing,
+          cantidad: existing.cantidad + 1,
+          subtotal: (existing.cantidad + 1) * existing.precio_unit
+        };
+        setItems(updated);
+        toast.success(`${producto.nombre}: cantidad ${existing.cantidad + 1}`);
+      } else {
+        // Agregar nuevo item
+        setItems([...items, {
+          codigo_producto: producto.codigo,
+          nombre_producto: producto.nombre,
+          cantidad: 1,
+          precio_unit: producto.precio_venta,
+          precio_original: producto.precio_venta,
+          subtotal: producto.precio_venta
+        }]);
+        toast.success(`${producto.nombre} agregado`);
+      }
+    } catch (error) {
+      toast.error("Producto no encontrado con ese código de barras");
+    }
   };
 
   const handleAddItem = () => {
@@ -150,22 +196,58 @@ const Ventas = () => {
           </h1>
           <p className="text-[#6B705C] mt-2">Registra y consulta ventas realizadas</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={() => resetForm()}
-              className="bg-[#4A5D23] hover:bg-[#3B4A1C] text-white"
-              data-testid="new-sale-button"
-            >
-              <Plus size={20} weight="bold" className="mr-2" />
-              Nueva Venta
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => {
+              if (!isDialogOpen) {
+                resetForm();
+                setIsDialogOpen(true);
+              }
+              setTimeout(() => setIsScannerOpen(true), 300);
+            }}
+            variant="outline"
+            className="border-[#386641] text-[#386641] hover:bg-[#E9F5E9]"
+            data-testid="quick-scan-button"
+          >
+            <Camera size={20} weight="duotone" className="mr-2" />
+            Escanear
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                onClick={() => resetForm()}
+                className="bg-[#4A5D23] hover:bg-[#3B4A1C] text-white"
+                data-testid="new-sale-button"
+              >
+                <Plus size={20} weight="bold" className="mr-2" />
+                Nueva Venta
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle data-testid="dialog-title">Nueva Venta</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6" data-testid="sale-form">
+              {/* Escáner rápido */}
+              <div className="flex items-center justify-between p-4 bg-[#E9F5E9] rounded-lg border border-[#386641]/20">
+                <div className="flex items-center gap-3">
+                  <Camera size={24} weight="duotone" className="text-[#386641]" />
+                  <div>
+                    <p className="font-semibold text-[#2D312E]">Venta rápida por código de barras</p>
+                    <p className="text-xs text-[#6B705C]">Escanea con la cámara para agregar productos al instante</p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="bg-[#386641] hover:bg-[#2C4F33] text-white"
+                  data-testid="scan-sale-button"
+                >
+                  <Camera size={18} weight="duotone" className="mr-2" />
+                  Escanear
+                </Button>
+              </div>
+
               {/* Agregar Productos */}
               <div className="space-y-4 p-4 bg-[#F9F8F6] rounded-lg border border-[#E8E6E1]">
                 <h3 className="font-semibold text-[#2D312E]">Agregar Producto</h3>
@@ -351,7 +433,14 @@ const Ventas = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleBarcodeScanned}
+      />
 
       <Card className="border-[#E8E6E1] shadow-sm" data-testid="ventas-table-card">
         <CardContent className="p-0">

@@ -12,23 +12,18 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import BarcodeScanner from "@/components/BarcodeScanner";
 
-const categorias = [
-  "Interior", "Flores", "Kokedamas", "Terrarios", "Suculentas", 
-  "Espinos", "Arreglos", "Macetas", "Insecticidas", "Fungicidas",
-  "Fertilizantes", "Enraizantes", "Abono Foliar", "Atomizadores", 
-  "Sustratos", "Accesorios"
-];
-
 const placeholderImg = "https://images.unsplash.com/photo-1601985705806-5b9a71f6004f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85";
 
 const Productos = () => {
   const { isAdmin } = useAuth();
   const [productos, setProductos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isNewCategoryOpen, setIsNewCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [editingProduct, setEditingProduct] = useState(null);
-  const [searchBarcode, setSearchBarcode] = useState("");
   const [isSearchScannerOpen, setIsSearchScannerOpen] = useState(false);
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
@@ -48,7 +43,32 @@ const Productos = () => {
 
   useEffect(() => {
     loadProductos();
+    loadCategorias();
   }, []);
+
+  const loadCategorias = async () => {
+    try {
+      const response = await api.get("/categorias");
+      setCategorias(response.data);
+    } catch (error) {
+      console.error("Error cargando categorías:", error);
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    try {
+      const response = await api.post("/categorias", { nombre: newCategoryName.trim() });
+      toast.success(`Categoría "${response.data.nombre}" creada`);
+      await loadCategorias();
+      setFormData((prev) => ({ ...prev, categoria: response.data.nombre }));
+      setNewCategoryName("");
+      setIsNewCategoryOpen(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Error al crear categoría");
+    }
+  };
 
   const loadProductos = async () => {
     try {
@@ -126,7 +146,6 @@ const Productos = () => {
 
   const handleSearchBarcodeScanned = async (code) => {
     setIsSearchScannerOpen(false);
-    setSearchBarcode(code);
     try {
       const response = await api.get(`/productos/barras/${code}`);
       handleEdit(response.data);
@@ -337,7 +356,7 @@ const Productos = () => {
                       data-testid="input-codigo-barras"
                       value={formData.codigo_barras}
                       onChange={(e) => setFormData({ ...formData, codigo_barras: e.target.value })}
-                      placeholder="Escanea o ingresa manualmente"
+                      placeholder={editingProduct ? "" : "Se generará automáticamente si lo dejas vacío"}
                     />
                     <Button
                       type="button"
@@ -355,19 +374,31 @@ const Productos = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="categoria">Categoría *</Label>
-                    <Select
-                      value={formData.categoria}
-                      onValueChange={(value) => setFormData({ ...formData, categoria: value })}
-                    >
-                      <SelectTrigger data-testid="select-categoria">
-                        <SelectValue placeholder="Selecciona categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categorias.map((cat) => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      <Select
+                        value={formData.categoria}
+                        onValueChange={(value) => setFormData({ ...formData, categoria: value })}
+                      >
+                        <SelectTrigger data-testid="select-categoria">
+                          <SelectValue placeholder="Selecciona categoría" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categorias.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.nombre}>{cat.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsNewCategoryOpen(true)}
+                        title="Nueva categoría"
+                        data-testid="new-category-button"
+                      >
+                        <Plus size={18} />
+                      </Button>
+                    </div>
                   </div>
                   {isAdmin && (
                     <div>
@@ -492,6 +523,48 @@ const Productos = () => {
         onClose={() => setIsSearchScannerOpen(false)}
         onScan={handleSearchBarcodeScanned}
       />
+
+      {/* Diálogo Nueva Categoría */}
+      <Dialog open={isNewCategoryOpen} onOpenChange={setIsNewCategoryOpen}>
+        <DialogContent className="max-w-md" data-testid="new-category-dialog">
+          <DialogHeader>
+            <DialogTitle>Nueva Categoría</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateCategory} className="space-y-4">
+            <div>
+              <Label htmlFor="new-cat-name">Nombre de la categoría *</Label>
+              <Input
+                id="new-cat-name"
+                data-testid="new-category-input"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Ej: Plantas Aromáticas"
+                required
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsNewCategoryOpen(false);
+                  setNewCategoryName("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-[#4A5D23] hover:bg-[#3B4A1C]"
+                data-testid="save-new-category-button"
+              >
+                Crear
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-[#E8E6E1] shadow-sm" data-testid="productos-table-card">
         <CardContent className="p-0">

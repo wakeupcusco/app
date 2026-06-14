@@ -15,6 +15,20 @@ from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 import bcrypt
 import jwt
+import random
+
+def generate_barcode() -> str:
+    """Genera un código de barras EAN-13 único basado en timestamp + random"""
+    import time
+    timestamp = str(int(time.time() * 1000))[-9:]
+    rand = str(random.randint(1000, 9999))
+    code12 = (timestamp + rand)[:12].zfill(12)
+    # Calcular dígito verificador EAN-13
+    odd_sum = sum(int(code12[i]) for i in range(0, 12, 2))
+    even_sum = sum(int(code12[i]) for i in range(1, 12, 2))
+    total = odd_sum + (even_sum * 3)
+    check_digit = (10 - (total % 10)) % 10
+    return code12 + str(check_digit)
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -244,6 +258,41 @@ async def logout(response: Response):
 async def get_me(user: dict = Depends(get_current_user)):
     return user
 
+# ==================== CATEGORIAS ====================
+
+class CategoryCreate(BaseModel):
+    nombre: str
+
+class Category(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    nombre: str
+
+@api_router.get("/categorias", response_model=List[Category])
+async def get_categories(user: dict = Depends(get_current_user)):
+    cats = await db.categories.find({}, {"_id": 0}).sort("nombre", 1).to_list(1000)
+    return cats
+
+@api_router.post("/categorias", response_model=Category)
+async def create_category(category: CategoryCreate, user: dict = Depends(get_current_user)):
+    nombre = category.nombre.strip()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="El nombre es requerido")
+    existing = await db.categories.find_one({"nombre": nombre}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="La categoría ya existe")
+    cat_id = str(ObjectId())
+    doc = {"id": cat_id, "nombre": nombre}
+    await db.categories.insert_one(doc)
+    return Category(**doc)
+
+@api_router.delete("/categorias/{cat_id}")
+async def delete_category(cat_id: str, user: dict = Depends(require_admin)):
+    result = await db.categories.delete_one({"id": cat_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    return {"message": "Categoría eliminada"}
+
 # ==================== PRODUCTOS ====================
 
 @api_router.post("/productos", response_model=Product)
@@ -256,6 +305,16 @@ async def create_product(product: ProductCreate, user: dict = Depends(get_curren
     fecha_creacion = datetime.now(timezone.utc).isoformat()
     
     doc = product.model_dump()
+    # Auto-generar código de barras si no se proporciona
+    if not doc.get('codigo_barras'):
+        # Asegurar que sea único
+        for _ in range(5):
+            new_barcode = generate_barcode()
+            existing_barcode = await db.products.find_one({"codigo_barras": new_barcode}, {"_id": 0})
+            if not existing_barcode:
+                doc['codigo_barras'] = new_barcode
+                break
+    
     doc['utilidad'] = utilidad
     doc['fecha_creacion'] = fecha_creacion
     
@@ -570,6 +629,22 @@ async def startup_event():
                 {"email": vendedor_email},
                 {"$set": {"password_hash": hash_password(vendedor_password)}}
             )
+    
+    # Seed categorías iniciales
+    default_categories = [
+        "Interior", "Flores", "Kokedamas", "Terrarios", "Suculentas",
+        "Espinos", "Arreglos", "Macetas", "Insecticidas", "Fungicidas",
+        "Fertilizantes", "Enraizantes", "Abono Foliar", "Atomizadores",
+        "Sustratos", "Accesorios"
+    ]
+    cat_count = await db.categories.count_documents({})
+    if cat_count == 0:
+        for cat_name in default_categories:
+            await db.categories.insert_one({
+                "id": str(ObjectId()),
+                "nombre": cat_name
+            })
+        logger.info(f"{len(default_categories)} categorías iniciales creadas")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
