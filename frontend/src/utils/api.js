@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-export const API = `https://app-a2du.onrender.com/api`;
+export const API = `https://app-2-9ywg.onrender.com`;
 
 const api = axios.create({
   baseURL: API,
