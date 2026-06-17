@@ -97,11 +97,6 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-[#F3F2EF] rounded-lg text-xs text-[#6B705C] space-y-1">
-            <p className="font-semibold text-[#2D312E]">Cuentas de prueba:</p>
-            <p><strong>Admin:</strong> admin@plantastika.com / admin123</p>
-            <p><strong>Vendedora:</strong> vendedora@plantastika.com / vendedora123</p>
-          </div>
         </CardContent>
       </Card>
     </div>
