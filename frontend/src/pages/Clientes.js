@@ -198,6 +198,7 @@ const Clientes = () => {
               <p className="text-[#6B705C]">No hay clientes registrados</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -244,6 +245,7 @@ const Clientes = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
