@@ -386,6 +386,22 @@ async def create_sale(sale: SaleCreate, user: dict = Depends(get_current_user)):
             {"codigo": item.codigo_producto},
             {"$inc": {"stock": -item.cantidad}}
         )
+
+    # Registrar el ingreso en caja según el método de pago
+    metodo = sale.metodo_pago.strip().lower()
+    cash_doc = {
+        "id": str(ObjectId()),
+        "fecha": fecha,
+        "concepto": f"Venta - {sale.vendedor}",
+        "efectivo": total if metodo == "efectivo" else 0,
+        "yape": total if metodo == "yape" else 0,
+        "plin": total if metodo == "plin" else 0,
+        "transferencia": total if metodo == "transferencia" else 0,
+        "tipo": "ingreso",
+        "total": total,
+        "observacion": f"Venta ID: {sale_id}"
+    }
+    await db.cash_movements.insert_one(cash_doc)
     
     return Sale(**doc)
 
@@ -410,6 +426,9 @@ async def delete_sale(sale_id: str, user: dict = Depends(require_admin)):
     result = await db.sales.delete_one({"id": sale_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    # Eliminar el movimiento de caja asociado a esta venta
+    await db.cash_movements.delete_many({"observacion": f"Venta ID: {sale_id}"})
 
     return {"message": "Venta eliminada exitosamente"}
 
@@ -436,6 +455,21 @@ async def create_purchase(purchase: PurchaseCreate, user: dict = Depends(require
             {"codigo": item.codigo_producto},
             {"$inc": {"stock": item.cantidad}}
         )
+
+    # Registrar el egreso en caja (se asume pago en efectivo por defecto)
+    cash_doc = {
+        "id": str(ObjectId()),
+        "fecha": fecha,
+        "concepto": f"Compra - {purchase.proveedor}",
+        "efectivo": total,
+        "yape": 0,
+        "plin": 0,
+        "transferencia": 0,
+        "tipo": "egreso",
+        "total": total,
+        "observacion": f"Compra ID: {purchase_id}"
+    }
+    await db.cash_movements.insert_one(cash_doc)
     
     return Purchase(**doc)
 
@@ -460,6 +494,9 @@ async def delete_purchase(purchase_id: str, user: dict = Depends(require_admin))
     result = await db.purchases.delete_one({"id": purchase_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Compra no encontrada")
+
+    # Eliminar el movimiento de caja asociado a esta compra
+    await db.cash_movements.delete_many({"observacion": f"Compra ID: {purchase_id}"})
 
     return {"message": "Compra eliminada exitosamente"}
 
