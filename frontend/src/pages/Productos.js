@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, PencilSimple, Trash, Package, UploadSimple, X, Barcode, Camera } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, Package, UploadSimple, X, Barcode, Camera, DownloadSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import * as XLSX from "xlsx";
 
 const placeholderImg = "https://images.unsplash.com/photo-1601985705806-5b9a71f6004f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxwb3R0ZWQlMjBwbGFudCUyMGluZG9vcnxlbnwwfHx8fDE3ODE0NjQ2MTd8MA&ixlib=rb-4.1.0&q=85";
 
@@ -53,6 +54,38 @@ const Productos = () => {
     } catch (error) {
       console.error("Error cargando categorías:", error);
     }
+  };
+
+  const handleExportExcel = () => {
+    if (productos.length === 0) {
+      toast.error("No hay productos para exportar");
+      return;
+    }
+
+    const data = productos.map((p) => ({
+      "Código": p.codigo,
+      "Nombre": p.nombre,
+      "Categoría": p.categoria,
+      "Código de Barras": p.codigo_barras || p.codigo,
+      "Precio Venta": p.precio_venta,
+      "Costo Compra": p.costo_compra,
+      "Stock": p.stock,
+      "Proveedor": p.proveedor || "",
+      "Ubicación": p.ubicacion || ""
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet["!cols"] = [
+      { wch: 14 }, { wch: 30 }, { wch: 16 }, { wch: 18 },
+      { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 18 }, { wch: 16 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Productos");
+
+    const fecha = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(workbook, `productos_${fecha}.xlsx`);
+    toast.success("Excel exportado exitosamente");
   };
 
   const handleCreateCategory = async (e) => {
@@ -242,6 +275,15 @@ const Productos = () => {
           <p className="text-[#6B705C] mt-2">Gestiona tu inventario de plantas y productos</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            onClick={handleExportExcel}
+            variant="outline"
+            className="border-[#4A5D23] text-[#4A5D23] hover:bg-[#E9F5E9]"
+            data-testid="export-excel-button"
+          >
+            <DownloadSimple size={20} weight="bold" className="mr-2" />
+            Exportar Excel
+          </Button>
           <Button
             onClick={() => setIsSearchScannerOpen(true)}
             variant="outline"
