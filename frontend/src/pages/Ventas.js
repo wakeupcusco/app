@@ -264,8 +264,8 @@ const Ventas = () => {
               {/* Agregar Productos */}
               <div className="space-y-4 p-4 bg-[#F9F8F6] rounded-lg border border-[#E8E6E1]">
                 <h3 className="font-semibold text-[#2D312E]">Agregar Producto</h3>
-                <div className="grid grid-cols-12 gap-3">
-                  <div className="col-span-5">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <div className="sm:col-span-5">
                     <Label>Producto</Label>
                     <Select
                       value={currentItem.producto}
@@ -283,7 +283,7 @@ const Ventas = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <Label>Cantidad</Label>
                     <Input
                       type="number"
@@ -293,7 +293,7 @@ const Ventas = () => {
                       onChange={(e) => setCurrentItem({ ...currentItem, cantidad: parseInt(e.target.value) || 1 })}
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="sm:col-span-3">
                     <Label className="flex items-center gap-1">
                       <Tag size={14} />
                       Precio (editable)
@@ -308,7 +308,7 @@ const Ventas = () => {
                       placeholder="Modifica para rebaja"
                     />
                   </div>
-                  <div className="col-span-2 flex items-end">
+                  <div className="sm:col-span-2 flex items-end">
                     <Button
                       type="button"
                       onClick={handleAddItem}
@@ -332,6 +332,7 @@ const Ventas = () => {
                 <div className="space-y-2">
                   <h3 className="font-semibold text-[#2D312E]">Productos en Venta</h3>
                   <div className="border border-[#E8E6E1] rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -386,6 +387,7 @@ const Ventas = () => {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </div>
                   <div className="flex justify-end">
                     <div className="text-right">
@@ -397,7 +399,7 @@ const Ventas = () => {
               )}
 
               {/* Datos de Venta */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="metodo_pago">Método de Pago *</Label>
                   <Select
@@ -467,6 +469,7 @@ const Ventas = () => {
               <p className="text-[#6B705C]">No hay ventas registradas</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -524,6 +527,7 @@ const Ventas = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
