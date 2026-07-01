@@ -27,6 +27,7 @@ const Productos = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isSearchScannerOpen, setIsSearchScannerOpen] = useState(false);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const [formData, setFormData] = useState({
     codigo: "",
     nombre: "",
@@ -119,8 +120,10 @@ const Productos = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("La imagen no debe superar los 2MB");
+    // Límite generoso sobre el archivo ORIGINAL de la cámara/galería;
+    // luego se redimensiona y comprime automáticamente antes de guardarla.
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("La foto es demasiado pesada (máx 15MB). Intenta con otra.");
       return;
     }
 
@@ -129,9 +132,19 @@ const Productos = () => {
       return;
     }
 
+    toast.loading("Procesando imagen...", { id: "img-processing" });
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      toast.dismiss("img-processing");
+      toast.error("No se pudo leer la imagen, intenta de nuevo");
+    };
     reader.onload = (event) => {
       const img = new Image();
+      img.onerror = () => {
+        toast.dismiss("img-processing");
+        toast.error("El archivo no es una imagen válida");
+      };
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const MAX_WIDTH = 600;
@@ -157,6 +170,7 @@ const Productos = () => {
         ctx.drawImage(img, 0, 0, width, height);
         const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.8);
         setFormData((prev) => ({ ...prev, imagen: compressedDataUrl }));
+        toast.dismiss("img-processing");
         toast.success("Imagen cargada exitosamente");
       };
       img.src = event.target.result;
@@ -168,6 +182,9 @@ const Productos = () => {
     setFormData({ ...formData, imagen: "" });
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
     }
   };
 
@@ -238,6 +255,9 @@ const Productos = () => {
     setEditingProduct(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
     }
   };
 
@@ -329,6 +349,15 @@ const Productos = () => {
                     </div>
                     <div className="flex flex-col gap-2">
                       <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        data-testid="camera-capture-input"
+                      />
+                      <input
                         ref={fileInputRef}
                         type="file"
                         accept="image/*"
@@ -339,11 +368,20 @@ const Productos = () => {
                       <Button
                         type="button"
                         variant="outline"
+                        onClick={() => cameraInputRef.current?.click()}
+                        data-testid="take-photo-button"
+                      >
+                        <Camera size={18} className="mr-2" />
+                        Tomar Foto
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => fileInputRef.current?.click()}
                         data-testid="upload-image-button"
                       >
                         <UploadSimple size={18} className="mr-2" />
-                        Subir Imagen
+                        Subir de Galería
                       </Button>
                       {formData.imagen && (
                         <Button
@@ -357,7 +395,7 @@ const Productos = () => {
                           Quitar Imagen
                         </Button>
                       )}
-                      <p className="text-xs text-[#6B705C]">Máx 2MB. JPG, PNG, WebP</p>
+                      <p className="text-xs text-[#6B705C]">Se comprime automáticamente. JPG, PNG, WebP</p>
                     </div>
                   </div>
                 </div>
