@@ -362,7 +362,7 @@ const Productos = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="codigo">Código *</Label>
                     <Input
@@ -413,7 +413,7 @@ const Productos = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="categoria">Categoría *</Label>
                     <div className="flex gap-2">
@@ -455,7 +455,7 @@ const Productos = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="stock">Stock *</Label>
                     <Input
@@ -480,7 +480,7 @@ const Productos = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Costo Compra: Solo visible para Admin */}
                   {isAdmin && (
                     <div>
@@ -510,7 +510,7 @@ const Productos = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="ubicacion">Ubicación</Label>
                     <Input
@@ -621,6 +621,7 @@ const Productos = () => {
               <p className="text-sm text-[#A5A58D]">Crea tu primer producto para comenzar</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -691,6 +692,7 @@ const Productos = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
