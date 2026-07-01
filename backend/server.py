@@ -394,6 +394,25 @@ async def get_sales(user: dict = Depends(get_current_user)):
     sales = await db.sales.find({}, {"_id": 0}).sort("fecha", -1).to_list(1000)
     return sales
 
+@api_router.delete("/ventas/{sale_id}")
+async def delete_sale(sale_id: str, user: dict = Depends(require_admin)):
+    sale = await db.sales.find_one({"id": sale_id}, {"_id": 0})
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    # Revertir el stock que esta venta había restado
+    for item in sale["items"]:
+        await db.products.update_one(
+            {"codigo": item["codigo_producto"]},
+            {"$inc": {"stock": item["cantidad"]}}
+        )
+
+    result = await db.sales.delete_one({"id": sale_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    return {"message": "Venta eliminada exitosamente"}
+
 # ==================== COMPRAS (Solo Admin) ====================
 
 @api_router.post("/compras", response_model=Purchase)
