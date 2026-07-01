@@ -425,6 +425,25 @@ async def get_purchases(user: dict = Depends(require_admin)):
     purchases = await db.purchases.find({}, {"_id": 0}).sort("fecha", -1).to_list(1000)
     return purchases
 
+@api_router.delete("/compras/{purchase_id}")
+async def delete_purchase(purchase_id: str, user: dict = Depends(require_admin)):
+    purchase = await db.purchases.find_one({"id": purchase_id}, {"_id": 0})
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Compra no encontrada")
+
+    # Revertir el stock que esta compra había sumado
+    for item in purchase["items"]:
+        await db.products.update_one(
+            {"codigo": item["codigo_producto"]},
+            {"$inc": {"stock": -item["cantidad"]}}
+        )
+
+    result = await db.purchases.delete_one({"id": purchase_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Compra no encontrada")
+
+    return {"message": "Compra eliminada exitosamente"}
+
 # ==================== CLIENTES ====================
 
 @api_router.post("/clientes", response_model=Customer)
