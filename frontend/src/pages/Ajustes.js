@@ -176,6 +176,7 @@ const Ajustes = () => {
               <p className="text-[#6B705C]">No hay ajustes registrados</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -212,6 +213,7 @@ const Ajustes = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
