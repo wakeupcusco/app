@@ -165,6 +165,19 @@ const Compras = () => {
     });
   };
 
+  const handleDeletePurchase = async (compra) => {
+    if (window.confirm(`¿Eliminar la compra a "${compra.proveedor}" por S/ ${compra.total.toFixed(2)}? Esto también restará el stock que sumó.`)) {
+      try {
+        await api.delete(`/compras/${compra.id}`);
+        toast.success("Compra eliminada exitosamente");
+        loadData();
+      } catch (error) {
+        console.error("Error eliminando compra:", error);
+        toast.error(error.response?.data?.detail || "Error al eliminar compra");
+      }
+    }
+  };
+
   const total = items.reduce((sum, item) => sum + item.subtotal, 0);
 
   return (
@@ -500,6 +513,7 @@ const Compras = () => {
                   <TableHead>Proveedor</TableHead>
                   <TableHead>Productos</TableHead>
                   <TableHead>Total</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -525,6 +539,18 @@ const Compras = () => {
                       </div>
                     </TableCell>
                     <TableCell className="font-bold text-[#4A5D23]">S/ {compra.total.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeletePurchase(compra)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        data-testid={`delete-purchase-${compra.id}`}
+                      >
+                        <Trash size={16} />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
