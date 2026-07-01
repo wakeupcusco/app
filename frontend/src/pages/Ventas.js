@@ -15,7 +15,7 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 const metodosPago = ["Efectivo", "Yape", "Plin", "Transferencia"];
 
 const Ventas = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -183,6 +183,19 @@ const Ventas = () => {
     setItems([]);
     setCurrentItem({ producto: null, cantidad: 1, precio_unit: 0 });
     setFormData({ metodo_pago: "Efectivo", vendedor: user?.nombre || "" });
+  };
+
+  const handleDeleteSale = async (venta) => {
+    if (window.confirm(`¿Eliminar la venta de "${venta.vendedor}" por S/ ${venta.total.toFixed(2)}? Esto también devolverá el stock vendido.`)) {
+      try {
+        await api.delete(`/ventas/${venta.id}`);
+        toast.success("Venta eliminada exitosamente");
+        loadData();
+      } catch (error) {
+        console.error("Error eliminando venta:", error);
+        toast.error(error.response?.data?.detail || "Error al eliminar venta");
+      }
+    }
   };
 
   const total = items.reduce((sum, item) => sum + item.subtotal, 0);
@@ -462,6 +475,7 @@ const Ventas = () => {
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Método Pago</TableHead>
                   <TableHead>Total</TableHead>
+                  {isAdmin && <TableHead className="text-right">Acciones</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -492,6 +506,20 @@ const Ventas = () => {
                       </span>
                     </TableCell>
                     <TableCell className="font-bold text-[#4A5D23]">S/ {venta.total.toFixed(2)}</TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteSale(venta)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          data-testid={`delete-sale-${venta.id}`}
+                        >
+                          <Trash size={16} />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
