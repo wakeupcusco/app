@@ -236,8 +236,8 @@ const Compras = () => {
                     Crear Producto Nuevo
                   </Button>
                 </div>
-                <div className="grid grid-cols-12 gap-3">
-                  <div className="col-span-5">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <div className="sm:col-span-5">
                     <Label>Producto Existente</Label>
                     <Select
                       value={currentItem.producto}
@@ -255,7 +255,7 @@ const Compras = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <Label>Cantidad</Label>
                     <Input
                       type="number"
@@ -265,7 +265,7 @@ const Compras = () => {
                       onChange={(e) => setCurrentItem({ ...currentItem, cantidad: parseInt(e.target.value) || 1 })}
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="sm:col-span-3">
                     <Label>Costo Unit.</Label>
                     <Input
                       type="number"
@@ -276,7 +276,7 @@ const Compras = () => {
                       onChange={(e) => setCurrentItem({ ...currentItem, costo_unit: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
-                  <div className="col-span-2 flex items-end">
+                  <div className="sm:col-span-2 flex items-end">
                     <Button
                       type="button"
                       onClick={handleAddItem}
@@ -298,6 +298,7 @@ const Compras = () => {
                 <div className="space-y-2">
                   <h3 className="font-semibold text-[#2D312E]">Productos en Compra</h3>
                   <div className="border border-[#E8E6E1] rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -331,6 +332,7 @@ const Compras = () => {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </div>
                   <div className="flex justify-end">
                     <div className="text-right">
@@ -370,7 +372,7 @@ const Compras = () => {
             <DialogTitle>Crear Producto Nuevo</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreateNewProduct} className="space-y-4" data-testid="new-product-form">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="np-codigo">Código *</Label>
                 <Input
@@ -393,7 +395,7 @@ const Compras = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="np-categoria">Categoría *</Label>
                 <Select
@@ -421,7 +423,7 @@ const Compras = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="np-costo">Costo Compra *</Label>
                 <Input
@@ -448,7 +450,7 @@ const Compras = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="np-stock-min">Stock Mínimo</Label>
                 <Input
@@ -506,6 +508,7 @@ const Compras = () => {
               <p className="text-[#6B705C]">No hay compras registradas</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -555,6 +558,7 @@ const Compras = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
