@@ -122,7 +122,7 @@ const Caja = () => {
               <DialogTitle data-testid="dialog-title">Nuevo Movimiento</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4" data-testid="movement-form">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="concepto">Concepto *</Label>
                   <Input
@@ -150,7 +150,7 @@ const Caja = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="efectivo">Efectivo</Label>
                   <Input
@@ -175,7 +175,7 @@ const Caja = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="plin">Plin</Label>
                   <Input
@@ -279,6 +279,7 @@ const Caja = () => {
               <p className="text-[#6B705C]">No hay movimientos registrados</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -329,6 +330,7 @@ const Caja = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
